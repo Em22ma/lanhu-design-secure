@@ -15,7 +15,10 @@ const { getDesignSchema } = await import("../skills/lanhu-design-secure/scripts/
 const { syncProject } = await import("../skills/lanhu-design-secure/scripts/sync_project.mjs");
 
 const projectUrl = "https://lanhuapp.com/web/#/item/project/stage?pid=p1&tid=t1";
-const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
+const png = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
 const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }];
 
 function installLanhuFixture({ latest = "v2", calls = [] } = {}) {

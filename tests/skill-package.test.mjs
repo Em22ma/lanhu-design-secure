@@ -5,8 +5,9 @@ import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
-const root = path.resolve(import.meta.dirname, "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillRoot = path.join(root, "skills", "lanhu-design-secure");
 const scriptsRoot = path.join(skillRoot, "scripts");
 
@@ -29,18 +30,25 @@ test("skill package has valid discovery metadata", async () => {
 
   const runtimePackage = JSON.parse(await readFile(path.join(skillRoot, "package.json"), "utf8"));
   const runtimeLock = JSON.parse(await readFile(path.join(skillRoot, "package-lock.json"), "utf8"));
-  assert.equal(runtimePackage.dependencies["playwright-core"], "1.62.1");
-  assert.equal(runtimeLock.packages["node_modules/playwright-core"].version, "1.62.1");
-  assert.match(
-    runtimeLock.packages["node_modules/playwright-core"].integrity,
-    /^sha512-[A-Za-z0-9+/=]+$/,
-  );
+  for (const [name, version] of Object.entries({
+    "ipaddr.js": "2.5.0",
+    "playwright-core": "1.62.1",
+    sharp: "0.35.3",
+  })) {
+    assert.equal(runtimePackage.dependencies[name], version);
+    assert.equal(runtimeLock.packages[`node_modules/${name}`].version, version);
+    assert.match(
+      runtimeLock.packages[`node_modules/${name}`].integrity,
+      /^sha512-[A-Za-z0-9+/=]+$/,
+    );
+  }
 });
 
 test("all command entry points expose help", async () => {
   for (const script of [
     "get_designs.mjs",
     "lanhu_login.mjs",
+    "lanhu_session.mjs",
     "install_browser_runtime.mjs",
     "download_design_images.mjs",
     "get_design_specs.mjs",

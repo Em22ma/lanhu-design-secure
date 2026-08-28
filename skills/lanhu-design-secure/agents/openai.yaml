@@ -1,4 +1,4 @@
 interface:
   display_name: "Lanhu Design Secure"
-  short_description: "Browser-managed Lanhu sync, specs, and slices"
-  default_prompt: "Use $lanhu-design-secure to sign in without copying Cookies and securely sync this Lanhu project."
+  short_description: "Persistent browser-managed Lanhu sync and slices"
+  default_prompt: "Use $lanhu-design-secure to sign in once without copying Cookies, keep the local browser session, and securely sync this Lanhu project."
