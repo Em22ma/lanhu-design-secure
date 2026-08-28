@@ -14,6 +14,7 @@ import {
 import { buildDesignSpecs } from "./design-specs.mjs";
 import { downloadSlicesData } from "./download_slices.mjs";
 import { atomicWriteFile, atomicWriteJson, resolveInside, sha256 } from "./safe-files.mjs";
+import { closeAuthenticatedSession } from "./secure-http.mjs";
 
 const MANIFEST_VERSION = 1;
 
@@ -335,5 +336,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     .catch((error) => {
       console.error(JSON.stringify({ status: "error", message: error.message }));
       process.exitCode = 1;
+    })
+    .finally(async () => {
+      await closeAuthenticatedSession();
     });
 }

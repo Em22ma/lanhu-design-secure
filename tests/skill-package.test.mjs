@@ -26,11 +26,22 @@ test("skill package has valid discovery metadata", async () => {
   assert.match(openai, /display_name: "Lanhu Design Secure"/);
   assert.match(openai, /default_prompt: ".*\$lanhu-design-secure/);
   await access(path.join(skillRoot, "LICENSE.txt"));
+
+  const runtimePackage = JSON.parse(await readFile(path.join(skillRoot, "package.json"), "utf8"));
+  const runtimeLock = JSON.parse(await readFile(path.join(skillRoot, "package-lock.json"), "utf8"));
+  assert.equal(runtimePackage.dependencies["playwright-core"], "1.62.1");
+  assert.equal(runtimeLock.packages["node_modules/playwright-core"].version, "1.62.1");
+  assert.match(
+    runtimeLock.packages["node_modules/playwright-core"].integrity,
+    /^sha512-[A-Za-z0-9+/=]+$/,
+  );
 });
 
 test("all command entry points expose help", async () => {
   for (const script of [
     "get_designs.mjs",
+    "lanhu_login.mjs",
+    "install_browser_runtime.mjs",
     "download_design_images.mjs",
     "get_design_specs.mjs",
     "get_design_slices.mjs",
@@ -50,5 +61,8 @@ test("security-sensitive primitives stay centralized", async () => {
     assert.doesNotMatch(source, /redirect:\s*["']follow["']/);
     if (name !== "secure-http.mjs") assert.doesNotMatch(source, /\bCookie\s*:/);
     if (name !== "safe-files.mjs") assert.doesNotMatch(source, /\bwriteFile\s*\(/);
+    assert.doesNotMatch(source, /\.cookies\s*\(/);
+    assert.doesNotMatch(source, /\.storageState\s*\(/);
+    assert.doesNotMatch(source, /cookie\.json/i);
   }
 });

@@ -3,6 +3,7 @@
 import path from "node:path";
 import { getDesigns, resolveDesignVersion, downloadFile } from "./lanhu-client.mjs";
 import { resolveInside } from "./safe-files.mjs";
+import { closeAuthenticatedSession } from "./secure-http.mjs";
 
 function usage() {
   return (
@@ -70,8 +71,7 @@ function extensionFromUrl(imgUrl, fallback = ".png") {
 try {
   const designsResult = await getDesigns(url);
   if (designsResult.status !== "success") {
-    console.error(JSON.stringify(designsResult));
-    process.exit(1);
+    throw new Error(designsResult.message || "获取设计图列表失败。");
   }
 
   const allDesigns = designsResult.designs;
@@ -97,26 +97,22 @@ try {
       if (partial.length === 1) {
         targets.push(partial[0]);
       } else if (partial.length > 1) {
-        console.error(
+        throw new Error(
           `"${sel}" 匹配到多个设计图：${partial.map((d) => d.name).join(", ")}`,
         );
-        process.exit(1);
       } else {
-        console.error(
+        throw new Error(
           `未找到设计图 "${sel}"。可用：${allDesigns.map((d) => `${d.index}. ${d.name}`).join(", ")}`,
         );
-        process.exit(1);
       }
     }
   }
 
   if (targets.length === 0) {
-    console.error("没有匹配到任何设计图。");
-    process.exit(1);
+    throw new Error("没有匹配到任何设计图。");
   }
   if (versionId && targets.length !== 1) {
-    console.error("--version-id 只能与单个设计图一起使用，避免把一个版本 ID 错套到多个设计图。");
-    process.exit(2);
+    throw new Error("--version-id 只能与单个设计图一起使用，避免把一个版本 ID 错套到多个设计图。");
   }
 
   const downloaded = [];
@@ -160,8 +156,10 @@ try {
     ),
   );
 
-  if (failed.length > 0) process.exit(1);
+  if (failed.length > 0) process.exitCode = 1;
 } catch (error) {
   console.error(JSON.stringify({ status: "error", message: error.message }));
-  process.exit(1);
+  process.exitCode = 1;
+} finally {
+  await closeAuthenticatedSession();
 }

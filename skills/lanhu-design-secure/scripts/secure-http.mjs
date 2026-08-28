@@ -2,6 +2,10 @@
 
 import { lookup as dnsLookup } from "node:dns/promises";
 import net from "node:net";
+import {
+  closeBrowserSession,
+  fetchLanhuJsonWithBrowser,
+} from "./browser-session.mjs";
 
 const MiB = 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = readBoundedInteger("LANHU_HTTP_TIMEOUT_MS", 30_000, 1_000, 120_000);
@@ -51,10 +55,18 @@ function getCookie() {
   const cookie = process.env.LANHU_COOKIE;
   if (!cookie || cookie === "your_lanhu_cookie_here") {
     throw new Error(
-      "LANHU_COOKIE 环境变量未设置。请使用只读蓝湖账号的临时会话 Cookie，并仅向当前命令注入。",
+      "LANHU_AUTH_MODE=cookie 需要 LANHU_COOKIE；推荐移除该配置并使用托管浏览器会话。",
     );
   }
   return cookie;
+}
+
+function authenticationMode() {
+  const configured = String(process.env.LANHU_AUTH_MODE || "").trim().toLowerCase();
+  if (configured && !["browser", "cookie"].includes(configured)) {
+    throw new Error("LANHU_AUTH_MODE 只允许 browser 或 cookie。");
+  }
+  return configured || "browser";
 }
 
 function isPrivateIpv4(address) {
@@ -239,16 +251,32 @@ function looksLikeImage(buffer, contentType) {
 }
 
 export async function fetchLanhuJson(url, { dds = false } = {}) {
+  const parsed = assertAuthenticatedEndpoint(url);
+  const authenticatedHeaders = {
+    ...COMMON_HEADERS,
+    Referer: dds ? "https://dds.lanhuapp.com/" : "https://lanhuapp.com/web/",
+    ...(dds ? { Authorization: "Basic dW5kZWZpbmVkOg==" } : {
+      "request-from": "web",
+      "real-path": "/item/project/product",
+    }),
+  };
+
+  if (authenticationMode() === "browser") {
+    return fetchLanhuJsonWithBrowser(parsed.href, {
+      headers: authenticatedHeaders,
+      label: dds ? "DDS " : "蓝湖 API ",
+      maxBytes: DEFAULT_JSON_LIMIT,
+      maxRedirects: MAX_REDIRECTS,
+      timeoutMs: DEFAULT_TIMEOUT_MS,
+      validateUrl: assertAuthenticatedEndpoint,
+    });
+  }
+
   const { response, cleanup } = await fetchFollowingRedirects(url, {
     authenticated: true,
     headers: () => ({
-      ...COMMON_HEADERS,
+      ...authenticatedHeaders,
       Cookie: getCookie(),
-      Referer: dds ? "https://dds.lanhuapp.com/" : "https://lanhuapp.com/web/",
-      ...(dds ? { Authorization: "Basic dW5kZWZpbmVkOg==" } : {
-        "request-from": "web",
-        "real-path": "/item/project/product",
-      }),
     }),
   });
   try {
@@ -262,6 +290,10 @@ export async function fetchLanhuJson(url, { dds = false } = {}) {
   } finally {
     cleanup();
   }
+}
+
+export async function closeAuthenticatedSession() {
+  await closeBrowserSession();
 }
 
 export async function fetchResourceJson(url) {

@@ -11,11 +11,29 @@
 
 ## Runtime and authentication
 
-Require Node.js 20+, network access, and `LANHU_COOKIE` in the current process environment. There are no runtime npm dependencies.
+Require Node.js 20+, network access, Chrome (default) or a supported Edge channel, and a dedicated Lanhu member account with only the project access required for design reading.
 
-Use a dedicated Lanhu member account with only the project access required for design reading. Obtain the Cookie locally from an authenticated `lanhuapp.com` browser request. Keep it in a secret manager and inject it only for one command. Never write it into a repository, `.env`, shell startup file, agent configuration, prompt, or log.
+Install the exact dependency version recorded in `package-lock.json` once:
 
-The scripts do not load `.env` files. Authentication failures use exit code `1` without printing the Cookie.
+```bash
+node scripts/install_browser_runtime.mjs
+```
+
+The installer runs `npm ci --omit=dev --ignore-scripts --no-audit --no-fund`. It installs `playwright-core` only and uses the already-installed browser channel; it does not download a browser.
+
+Run any project command afterward. The first authenticated request opens `https://lanhuapp.com/web/` in a dedicated browser profile when login is needed. The user logs in normally and the command resumes automatically. The profile defaults to `~/.lanhu-design-secure/browser-profile`; its directory is created with mode `0700`. Scripts never call Cookie export APIs or write a `cookie.json`/storage-state file.
+
+Useful controls:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `LANHU_BROWSER_CHANNEL` | `chrome` | Allowlisted Playwright channel such as `chrome`, `chrome-beta`, or `msedge` |
+| `LANHU_BROWSER_PROFILE_DIR` | Dedicated profile under the user directory | Override with another dedicated directory; never point at the normal browser profile |
+| `LANHU_LOGIN_TIMEOUT_MS` | `300000` | Interactive login wait, bounded to 30 seconds–15 minutes |
+| `LANHU_NONINTERACTIVE` | unset | Set to `1` to fail instead of opening a login window |
+| `LANHU_AUTH_MODE` | `browser` | Set `cookie` only for an explicitly configured legacy/CI fallback |
+
+`LANHU_AUTH_MODE=cookie` plus process-scoped `LANHU_COOKIE` remains only for legacy/CI compatibility. Do not ask interactive users to copy Cookies. The scripts do not load `.env` files.
 
 ## Security boundaries
 
@@ -23,8 +41,8 @@ The scripts do not load `.env` files. Authentication failures use exit code `1` 
 
 | Class | Cookie | Allowed destination | Additional controls |
 |---|---:|---|---|
-| Authenticated API | Yes | Exact allowlisted HTTPS Lanhu endpoints | Cross-origin redirects rejected |
-| JSON/image resource | Never | Trusted Lanhu/Alibaba OSS HTTPS hosts | Host allowlist, DNS/private-IP checks, redirect revalidation, timeouts and byte limits |
+| Authenticated API | Browser-managed session | Exact allowlisted HTTPS Lanhu endpoints | No Cookie export/header construction; cross-origin redirects rejected |
+| JSON/image resource | No session | Trusted Lanhu/Alibaba OSS HTTPS hosts | Host allowlist, DNS/private-IP checks, redirect revalidation, timeouts and byte limits |
 
 Authenticated endpoints are limited to:
 
@@ -45,6 +63,8 @@ Default limits:
 - Redirects: 5
 
 Operators may lower or raise bounded limits with `LANHU_HTTP_TIMEOUT_MS`, `LANHU_MAX_JSON_BYTES`, and `LANHU_MAX_ASSET_BYTES`. Do not disable the controls.
+
+Close the managed browser context at the end of every command so the dedicated profile is not left locked. A second process using the same profile must fail closed with a clear error.
 
 Writes use a temporary file in the destination directory, fsync, and atomic rename. Existing identical content is skipped. Different content requires `--force`. Every successful write returns a SHA-256 digest.
 
@@ -106,6 +126,14 @@ The manifest records project identity, design/version/source, scale, relative pa
 On later runs, sync resolves current versions and verifies every recorded file digest. An unchanged, intact design is skipped. Changed versions use a new version directory, preserving older artifacts for rollback. The manifest is replaced atomically only after all selected changes succeed.
 
 ## Individual commands
+
+### `lanhu_login.mjs`
+
+```bash
+node scripts/lanhu_login.mjs "<url>"
+```
+
+Optionally verify authentication before other work. It opens the dedicated login window only when needed and returns the project name and design count, never session material.
 
 ### `get_designs.mjs`
 

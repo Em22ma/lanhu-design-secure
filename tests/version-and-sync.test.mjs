@@ -8,6 +8,7 @@ import test from "node:test";
 
 process.env.NODE_ENV = "test";
 process.env.LANHU_COOKIE = "session=version-test";
+process.env.LANHU_AUTH_MODE = "cookie";
 
 const http = await import("../skills/lanhu-design-secure/scripts/secure-http.mjs");
 const { getDesignSchema } = await import("../skills/lanhu-design-secure/scripts/lanhu-client.mjs");

@@ -13,40 +13,47 @@
 | 文件校验 | 图片类型校验、SHA-256、原子写入、默认拒绝静默覆盖 |
 | 版本一致性 | 截图、Sketch JSON、DDS Schema、切图元数据绑定同一个版本 ID |
 | 增量同步 | 版本化目录和 `lanhu-manifest.json`，按版本与文件哈希跳过未变化设计 |
-| 凭据落盘 | manifest、规格和切图元数据不保存 Cookie 或远程签名下载 URL |
+| 无感认证 | 首次/过期时只需在专用浏览器正常登录；无需复制 Cookie |
+| 凭据隔离 | 不导出 Cookie，不生成明文凭据文件；manifest 与规格不保存签名 URL |
 
 ## 安装
 
 发布后可固定版本安装：
 
 ```bash
-npx skills add Em22ma/lanhu-design-secure#v1.0.0
+npx skills add Em22ma/lanhu-design-secure#v1.1.0
 ```
 
 也可以克隆仓库后直接使用 `skills/lanhu-design-secure/`。
 
-要求：Node.js 20+、网络访问权限，以及对目标蓝湖项目具有只读权限的账号会话 Cookie。无运行时 npm 依赖。
+要求：Node.js 20+、Chrome（或受支持的 Edge channel）、网络访问权限，以及对目标蓝湖项目具有只读权限的账号。
 
-## Cookie 安全
+## 首次登录：不复制 Cookie
 
-蓝湖没有公开 OAuth/API，此 Skill 必须使用浏览器会话 Cookie。建议为自动化单独创建低权限、只读的蓝湖成员账号。
-
-不要把 Cookie 写进项目、`.env`、shell 启动文件、Agent 全局配置或聊天内容。推荐存入系统密钥链，并只注入当前命令。例如 macOS：
+先安装锁定版本的轻量浏览器控制库；它使用本机现有 Chrome，不下载另一个浏览器：
 
 ```bash
-LANHU_COOKIE="$(security find-generic-password -a "$USER" -s lanhu-design-cookie -w)" \
-  node skills/lanhu-design-secure/scripts/get_designs.mjs "<lanhu-project-url>"
+node skills/lanhu-design-secure/scripts/install_browser_runtime.mjs
 ```
 
-脚本不会加载 `.env`，也不会输出 Cookie。HTTP 401/403 表示需要在本机更新会话。
+随后直接运行任意蓝湖命令。第一次或会话真正失效时，会自动打开专用蓝湖窗口：你只需像平时一样登录，命令会自动继续。无需打开开发者工具、复制 Cookie、设置环境变量或更新终端。
+
+也可先单独验证登录：
+
+```bash
+node skills/lanhu-design-secure/scripts/lanhu_login.mjs "<lanhu-project-url>"
+```
+
+会话保存在 `~/.lanhu-design-secure/browser-profile` 的独立浏览器目录中；脚本不读取/导出 Cookie，也不会生成 `cookie.json`。不要把该目录指向日常 Chrome 用户目录。建议为自动化单独创建低权限、只读的蓝湖成员账号。
+
+`LANHU_AUTH_MODE=cookie` 仅保留给已经安全注入凭据的 CI/旧环境，日常使用不需要。
 
 默认资源白名单支持 `lanhuapp.com` 子域名和阿里云 OSS `aliyuncs.com`。如果真实项目使用其他 CDN，先在本机确认域名，再通过 `LANHU_ASSET_HOSTS=精确主机名` 临时追加；不要填写宽泛的第三方域名后缀。
 
 ## 推荐：项目级增量同步
 
 ```bash
-LANHU_COOKIE="$(security find-generic-password -a "$USER" -s lanhu-design-cookie -w)" \
-  node skills/lanhu-design-secure/scripts/sync_project.mjs \
+node skills/lanhu-design-secure/scripts/sync_project.mjs \
   "https://lanhuapp.com/web/#/item/project/stage?tid=TEAM&pid=PROJECT" \
   --output /absolute/path/to/project/.lanhu \
   --designs all \

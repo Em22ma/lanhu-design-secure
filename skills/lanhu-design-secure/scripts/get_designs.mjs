@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { getDesigns } from "./lanhu-client.mjs";
+import { closeAuthenticatedSession } from "./secure-http.mjs";
 
 const url = process.argv[2];
 if (url === "-h" || url === "--help") {
@@ -19,8 +20,10 @@ if (!url || process.argv.length > 3) {
 try {
   const result = await getDesigns(url);
   console.log(JSON.stringify(result, null, 2));
-  if (result.status !== "success") process.exit(1);
+  if (result.status !== "success") process.exitCode = 1;
 } catch (error) {
   console.error(JSON.stringify({ status: "error", message: error.message }));
-  process.exit(1);
+  process.exitCode = 1;
+} finally {
+  await closeAuthenticatedSession();
 }

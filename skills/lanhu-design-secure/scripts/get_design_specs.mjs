@@ -5,6 +5,7 @@ import { getDesignSchema, downloadFile } from "./lanhu-client.mjs";
 import { atomicWriteFile, atomicWriteJson, resolveInside } from "./safe-files.mjs";
 import { buildDesignSpecs } from "./design-specs.mjs";
 import { minifyHtml } from "./design-converter.mjs";
+import { closeAuthenticatedSession } from "./secure-http.mjs";
 
 function usage() {
   return `usage: node scripts/get_design_specs.mjs <lanhu_url> --design <name_or_index> [--version-id <id>] [--output <dir>] [--no-minify] [--download-images] [--referer <url>] [--force]
@@ -97,5 +98,7 @@ try {
   if (Array.isArray(result.images_failed) && result.images_failed.length > 0) process.exitCode = 1;
 } catch (error) {
   console.error(JSON.stringify({ status: "error", message: error.message }));
-  process.exit(1);
+  process.exitCode = 1;
+} finally {
+  await closeAuthenticatedSession();
 }

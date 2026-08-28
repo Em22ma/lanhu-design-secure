@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { getDesignSlicesInfo } from "./lanhu-client.mjs";
+import { closeAuthenticatedSession } from "./secure-http.mjs";
 
 function usage() {
   return (
@@ -48,8 +49,10 @@ if (!url || !designName) {
 try {
   const result = await getDesignSlicesInfo(url, designName, includeMetadata, { versionId });
   console.log(JSON.stringify(result, null, 2));
-  if (result.status !== "success") process.exit(1);
+  if (result.status !== "success") process.exitCode = 1;
 } catch (error) {
   console.error(JSON.stringify({ status: "error", message: error.message }));
-  process.exit(1);
+  process.exitCode = 1;
+} finally {
+  await closeAuthenticatedSession();
 }
