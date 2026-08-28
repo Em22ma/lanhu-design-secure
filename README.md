@@ -9,11 +9,11 @@
 | 能力 | 本项目 |
 |---|---|
 | Cookie 隔离 | 只向精确白名单蓝湖 API 端点发送，资源/CDN 请求永不携带 Cookie |
-| 网络防护 | CDN 主机白名单、HTTPS、逐跳重定向校验、私网/回环/保留地址阻断、超时与响应体限制 |
-| 文件校验 | 图片类型校验、SHA-256、原子写入、默认拒绝静默覆盖 |
+| 网络防护 | CDN 主机白名单、HTTPS、逐跳重定向校验、DNS 公网校验与固定连接、私网/回环/保留地址阻断、超时与响应体限制 |
+| 文件校验 | PNG/JPEG/GIF/WebP 完整解码与像素上限、默认拒绝 SVG、SHA-256、原子写入、拒绝静默覆盖 |
 | 版本一致性 | 截图、Sketch JSON、DDS Schema、切图元数据绑定同一个版本 ID |
 | 增量同步 | 版本化目录和 `lanhu-manifest.json`，按版本与文件哈希跳过未变化设计 |
-| 无感认证 | 首次/过期时只需在专用浏览器正常登录；无需复制 Cookie |
+| 无感认证 | 本机后台浏览器代理持续托管会话；首次/真正过期时登录，无需复制 Cookie |
 | 凭据隔离 | 不导出 Cookie，不生成明文凭据文件；manifest 与规格不保存签名 URL |
 
 ## 安装
@@ -21,12 +21,12 @@
 发布后可固定版本安装：
 
 ```bash
-npx skills add Em22ma/lanhu-design-secure#v1.1.0
+npx skills add Em22ma/lanhu-design-secure#v1.2.0
 ```
 
 也可以克隆仓库后直接使用 `skills/lanhu-design-secure/`。
 
-要求：Node.js 20+、Chrome（或受支持的 Edge channel）、网络访问权限，以及对目标蓝湖项目具有只读权限的账号。
+要求：Node.js 20.9+、Chrome（或受支持的 Edge channel）、网络访问权限，以及对目标蓝湖项目具有只读权限的账号。
 
 ## 首次登录：不复制 Cookie
 
@@ -36,7 +36,7 @@ npx skills add Em22ma/lanhu-design-secure#v1.1.0
 node skills/lanhu-design-secure/scripts/install_browser_runtime.mjs
 ```
 
-随后直接运行任意蓝湖命令。第一次或会话真正失效时，会自动打开专用蓝湖窗口：你只需像平时一样登录，命令会自动继续。无需打开开发者工具、复制 Cookie、设置环境变量或更新终端。
+随后直接运行任意蓝湖命令。第一次或会话真正失效时，会自动打开专用蓝湖窗口：你只需像平时一样登录，命令会自动继续。登录后窗口自动最小化，由本机后台代理继续托管会话，因此后续命令不会因为自身退出而丢失登录。无需打开开发者工具、复制 Cookie、设置环境变量或更新终端。
 
 也可先单独验证登录：
 
@@ -44,7 +44,16 @@ node skills/lanhu-design-secure/scripts/install_browser_runtime.mjs
 node skills/lanhu-design-secure/scripts/lanhu_login.mjs "<lanhu-project-url>"
 ```
 
-会话保存在 `~/.lanhu-design-secure/browser-profile` 的独立浏览器目录中；脚本不读取/导出 Cookie，也不会生成 `cookie.json`。不要把该目录指向日常 Chrome 用户目录。建议为自动化单独创建低权限、只读的蓝湖成员账号。
+会话保存在 `~/.lanhu-design-secure/browser-profile` 的独立浏览器目录中；脚本不读取/导出 Cookie，也不会生成 `cookie.json`。后台代理只监听该私有目录中的本机 Socket（权限 `0600`），且只接受固定的只读蓝湖 API。不要把该目录指向日常 Chrome 用户目录。建议为自动化单独创建低权限、只读的蓝湖成员账号。
+
+查看或停止后台会话（`starting` 表示正在启动，`busy` 表示正在等待登录或处理请求，`stopping` 表示正在安全关闭）：
+
+```bash
+node skills/lanhu-design-secure/scripts/lanhu_session.mjs status
+node skills/lanhu-design-secure/scripts/lanhu_session.mjs stop
+```
+
+停止代理、退出系统或蓝湖会话真正过期后，下次命令会重新打开登录窗口。
 
 `LANHU_AUTH_MODE=cookie` 仅保留给已经安全注入凭据的 CI/旧环境，日常使用不需要。
 
@@ -97,7 +106,7 @@ python3 ~/.codex/skills/.system/skill-creator/scripts/quick_validate.py \
   skills/lanhu-design-secure
 ```
 
-测试覆盖 Cookie 目的域隔离、重定向、私网地址、体积/图片校验、原子写、覆盖保护、版本固定、远程 URL 清除，以及增量同步跳过逻辑。
+测试覆盖后台会话跨命令复用、登录/启动/请求/排队期间的安全停止、管理状态准确性、Socket 权限、Cookie 目的域隔离、重定向、DNS 卡死/取消/固定公网地址、IPv4/IPv6 特殊用途地址、全链路绝对超时、流式响应上限、位图完整解码与像素上限、OSS 通用 MIME 安全识别、SVG 拒绝、原子写、覆盖保护、版本固定、远程 URL 清除，以及增量同步跳过逻辑。
 
 ## 安全问题
 

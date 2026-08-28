@@ -11,17 +11,18 @@ Read `references/lanhu-design-tools.md` for complete command contracts. Read `re
 
 ## Authenticate without copying Cookies
 
-Require Node.js 20+, Chrome or a supported Edge channel, and a dedicated, read-only Lanhu account. Do not ask the user to copy a Cookie.
+Require Node.js 20.9+, Chrome or a supported Edge channel, and a dedicated, read-only Lanhu account. Do not ask the user to copy a Cookie.
 
-On first use, install the exact locked browser runtime if it is absent:
+On first use, install the exact locked browser and image-validation runtimes if they are absent:
 
 ```bash
 node scripts/install_browser_runtime.mjs
 ```
 
-Then run the requested command normally. A dedicated Lanhu browser opens when no valid session exists. Hand control to the user for login; do not type, read, inspect, export, or store credentials yourself. After login, the command resumes and later commands reuse the browser profile. Authentication expiry opens the same login window again without requiring DevTools or terminal secrets.
+Then run the requested command normally. A dedicated Lanhu browser opens when no valid session exists. Hand control to the user for login; do not type, read, inspect, export, or store credentials yourself. After login, minimize the window and let the private local broker keep that same browser process alive across commands. Authentication expiry opens the same login window again without requiring DevTools or terminal secrets.
 
 - Keep the managed profile at `~/.lanhu-design-secure/browser-profile` with directory mode `0700`.
+- Keep the broker on its private local Socket (`0600` on Unix). Use `node scripts/lanhu_session.mjs status` to inspect it and `node scripts/lanhu_session.mjs stop` to end it.
 - Never use the user's normal Chrome profile or call Playwright Cookie/storage export APIs.
 - Never put Cookies in chat, source files, `.env`, shell startup files, project settings, logs, or agent configuration.
 - Use `LANHU_AUTH_MODE=cookie` only for explicitly requested legacy/CI compatibility; never suggest it for normal interactive use.

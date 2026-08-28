@@ -11,7 +11,7 @@
 
 ## Runtime and authentication
 
-Require Node.js 20+, network access, Chrome (default) or a supported Edge channel, and a dedicated Lanhu member account with only the project access required for design reading.
+Require Node.js 20.9+, network access, Chrome (default) or a supported Edge channel, and a dedicated Lanhu member account with only the project access required for design reading.
 
 Install the exact dependency version recorded in `package-lock.json` once:
 
@@ -19,16 +19,18 @@ Install the exact dependency version recorded in `package-lock.json` once:
 node scripts/install_browser_runtime.mjs
 ```
 
-The installer runs `npm ci --omit=dev --ignore-scripts --no-audit --no-fund`. It installs `playwright-core` only and uses the already-installed browser channel; it does not download a browser.
+The installer runs `npm ci --omit=dev --ignore-scripts --no-audit --no-fund`. It installs the locked `playwright-core` controller, `sharp` image decoder (including its platform package), and `ipaddr.js` address classifier, and uses the already-installed browser channel; it does not download a browser.
 
-Run any project command afterward. The first authenticated request opens `https://lanhuapp.com/web/` in a dedicated browser profile when login is needed. The user logs in normally and the command resumes automatically. The profile defaults to `~/.lanhu-design-secure/browser-profile`; its directory is created with mode `0700`. Scripts never call Cookie export APIs or write a `cookie.json`/storage-state file.
+Run any project command afterward. The first authenticated request opens `https://lanhuapp.com/web/` in a dedicated browser profile when login is needed. The user logs in normally and the command resumes automatically. A detached local broker keeps that same browser process alive across later commands and minimizes its window after authentication. The profile defaults to `~/.lanhu-design-secure/browser-profile`; its directory is created with mode `0700`. Scripts never call Cookie export APIs or write a `cookie.json`/storage-state file.
+
+The broker listens only on a private local Socket under `~/.lanhu-design-secure` (`0600` on Unix), keeps the browser's operating-system sandbox enabled, serializes data requests, keeps status/stop responsive while a login is pending, revalidates every destination against its own exact GET endpoint allowlist, rejects client-supplied Cookie/proxy credentials, and returns JSON data without browser storage or response headers. Processes running as the same OS user are inside this local trust boundary.
 
 Useful controls:
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `LANHU_BROWSER_CHANNEL` | `chrome` | Allowlisted Playwright channel such as `chrome`, `chrome-beta`, or `msedge` |
-| `LANHU_BROWSER_PROFILE_DIR` | Dedicated profile under the user directory | Override with another dedicated directory; never point at the normal browser profile |
+| `LANHU_BROWSER_PROFILE_DIR` | `~/.lanhu-design-secure/browser-profile` | Optional dedicated descendant of `~/.lanhu-design-secure`; external paths and symlinked components are rejected |
 | `LANHU_LOGIN_TIMEOUT_MS` | `300000` | Interactive login wait, bounded to 30 seconds–15 minutes |
 | `LANHU_NONINTERACTIVE` | unset | Set to `1` to fail instead of opening a login window |
 | `LANHU_AUTH_MODE` | `browser` | Set `cookie` only for an explicitly configured legacy/CI fallback |
@@ -51,7 +53,7 @@ Authenticated endpoints are limited to:
 - `https://lanhuapp.com/api/project/multi_info`
 - `https://dds.lanhuapp.com/api/dds/image/store_schema_revise`
 
-Image downloads also require a supported image signature. `file://`, plain HTTP, embedded URL credentials, loopback, private, link-local, documentation and reserved IP ranges are rejected. Redirects are handled manually and revalidated at every hop.
+Authenticated responses are consumed through a browser-page `ReadableStream`; decoded bytes are counted and the stream is cancelled immediately at the configured limit. `Content-Length`, when available, is only an early rejection hint. Resource DNS results come from a dedicated, cancelable A/AAAA resolver, are checked with a locked address-classification library, and each request is pinned to one of those already-validated public IPs while retaining TLS SNI and the original Host. One absolute deadline covers DNS, redirects, connection, and body streaming; the unused resolver family is cancelled as soon as a usable address is selected. Image downloads require a structurally valid PNG, JPEG, GIF, or WebP payload that fully decodes within frame, pixel, dimension, and decoded-memory limits. Generic OSS `application/octet-stream` is accepted only after those checks and normalized to the decoded raster MIME. SVG is rejected by default rather than regex-sanitized. `file://`, plain HTTP, non-default HTTPS ports, embedded URL credentials, loopback, private, link-local, documentation and reserved IP ranges are rejected. Redirects are rejected for authenticated browser fetches and revalidated hop-by-hop for unauthenticated resources.
 
 Resource hosts default to `lanhuapp.com` and its subdomains plus Alibaba OSS hosts under `aliyuncs.com`. If a real Lanhu project uses another CDN, inspect the hostname locally and add only that exact hostname with comma-separated `LANHU_ASSET_HOSTS`; never add a broad unrelated suffix.
 
@@ -64,7 +66,16 @@ Default limits:
 
 Operators may lower or raise bounded limits with `LANHU_HTTP_TIMEOUT_MS`, `LANHU_MAX_JSON_BYTES`, and `LANHU_MAX_ASSET_BYTES`. Do not disable the controls.
 
-Close the managed browser context at the end of every command so the dedicated profile is not left locked. A second process using the same profile must fail closed with a clear error.
+Do not close the managed browser at the end of a normal command; only its IPC connection ends. The local broker owns the profile lock and serializes concurrent data commands. Inspect or stop it explicitly:
+
+```bash
+node scripts/lanhu_session.mjs status
+node scripts/lanhu_session.mjs stop
+```
+
+Status is `starting` while a detached broker owns the atomic startup marker, `running` when idle, `busy` while a login or data request is in progress, `stopping` during verified shutdown, and `stopped` only when neither a broker nor a live startup marker exists. `unresponsive`, `incompatible`, or `stop_failed` are failures and the management command exits nonzero; they are never reported as a successful stop.
+
+Stopping the broker closes the dedicated browser. The next authenticated command starts a new broker and may require login again.
 
 Writes use a temporary file in the destination directory, fsync, and atomic rename. Existing identical content is skipped. Different content requires `--force`. Every successful write returns a SHA-256 digest.
 
@@ -134,6 +145,15 @@ node scripts/lanhu_login.mjs "<url>"
 ```
 
 Optionally verify authentication before other work. It opens the dedicated login window only when needed and returns the project name and design count, never session material.
+
+### `lanhu_session.mjs`
+
+```bash
+node scripts/lanhu_session.mjs status
+node scripts/lanhu_session.mjs stop
+```
+
+Report whether the local browser broker is running or stop it gracefully. These commands never return session material.
 
 ### `get_designs.mjs`
 
