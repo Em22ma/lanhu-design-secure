@@ -1,0 +1,14 @@
+{
+  "name": "lanhu-design-secure",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "check": "node scripts/check-syntax.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "validate": "npm run check && npm test"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lanhu Design Secure"
+  short_description: "Securely sync Lanhu designs, specs, and slices"
+  default_prompt: "Use $lanhu-design-secure to securely sync this Lanhu project and inspect the changed designs."
